@@ -45,11 +45,11 @@ let y = 0;
 // Main write function
 //
 //--------------------------------
-function processMap(p_map, p_fileName) {
+function processMap(map, fileName) {
 
     // Split full filename path into the filename (without extension) and the directory
-    fileBaseName = FileInfo.completeBaseName(p_fileName).replace(/[^a-zA-Z0-9-_]/g, "_");
-    filePath = FileInfo.path(p_fileName) + "/";
+    fileBaseName = FileInfo.completeBaseName(fileName).replace(/[^a-zA-Z0-9-_]/g, "_");
+    filePath = FileInfo.path(fileName) + "/";
 
     // Replace the ‘/’ characters in the file path for ‘\’ on Windows
     filePath = FileInfo.toNativeSeparators(filePath);
@@ -63,11 +63,11 @@ function processMap(p_map, p_fileName) {
     // Process all Tilemaps first
     //
     //--------------------------------------
-    for (let j = 0; j < p_map.tilesets.length; j++) {
+    for (let j = 0; j < map.tilesets.length; j++) {
 
         let tilemapStr = "";
         let z = 0;
-        let tileset = p_map.tilesets[j];
+        let tileset = map.tilesets[j];
         let iHeader = false;
         let tilesourceFileData = "";
 
@@ -112,9 +112,9 @@ function processMap(p_map, p_fileName) {
         // Loop through the tile layers
         //
         //------------------------------------
-        for (let i = 0; i < p_map.layerCount; ++i) {
+        for (let i = 0; i < map.layerCount; ++i) {
 
-            currentLayer = p_map.layerAt(i);
+            currentLayer = map.layerAt(i);
 
             //-------------------------------------------
             // Must be aTile layer, and hasto be visible
