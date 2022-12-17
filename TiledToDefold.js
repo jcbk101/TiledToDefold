@@ -154,10 +154,10 @@ function processMap(map, fileName) {
                 if (tempMap != "") {
 
                     // Write the tilemap file
-                    let tilemapFile = new TextFile(filePath + currentLayer.name + ".lua", TextFile.WriteOnly);
+                    let tilemapFile = new TextFile(filePath + fileBaseName + "_" + currentLayer.name + ".lua", TextFile.WriteOnly);
                     tilemapFile.write(tempMap);
                     tilemapFile.commit();
-                    console.log("Tilemap file exported to " + filePath + currentLayer.name + ".lua");
+                    console.log("Tilemap file exported to " + filePath + fileBaseName + "_" + currentLayer.name + ".lua");
 
                     // Z-Position
                     z++;
