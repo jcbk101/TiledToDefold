@@ -76,6 +76,8 @@ function processMap(p_map, p_fileName) {
         // to be considered a tilesource for Defold
         //-------------------------------------------
         if (tileset.image == "") {
+
+            // Atlas creation using acollection of images. Defold uses 2048x2048 max I believe
             tilesourceFileData = processImageCollection(tileset);
 
             // Write tilesource file
@@ -138,7 +140,7 @@ function processMap(p_map, p_fileName) {
                     tilemapStr += tempMap;
                     tilemapStr += "}\n";
 
-                    //
+                    // Z-Position
                     z++;
                 }
             }
@@ -157,23 +159,8 @@ function processMap(p_map, p_fileName) {
                     tilemapFile.commit();
                     console.log("Tilemap file exported to " + filePath + currentLayer.name + ".lua");
 
-
-                    //     // Add the tilesource header once per file
-                    //     if (!iHeader) {
-                    //         tilemapStr += tileMapFileData;
-                    //         iHeader = true;
-                    //     }
-
-                    //     tilemapStr += "layers {\n";
-                    //     tilemapStr += "  id: \"" + currentLayer.name + "\"\n";
-                    //     tilemapStr += "  z: " + (z / 10000) + "\n";
-                    //     tilemapStr += "  is_visible: " + ((currentLayer.visible) ? 1 : 0) + "\n";
-                    //     tilemapStr += tempMap;
-                    //     tilemapStr += "}\n";
-
-                    //     //
+                    // Z-Position
                     z++;
-
                     continue;
                 }
             }
@@ -216,11 +203,12 @@ function exportTileLayer(currentLayer, tileset) {
 
             let currentTile = currentLayer.cellAt(x, y);
 
-            //If not defined, write tile 0
+            //Only write tile data for tiles map entries that exist
             if (currentTile.tileId != -1) {
 
+                // Get this tile's tileset for comparison.
+                // This map should only contain tile entries from the active tileset
                 let cSet = currentLayer.tileAt(x, y).tileset;
-                //                set += cSet + "\n";
 
                 if (tileset != cSet)
                     continue;
@@ -259,12 +247,13 @@ function processImageCollection(tileset) {
 
         let tile = tileset.tiles[c];
 
-        //If not defined, write tile 0
+        //Header info
         stringData += "images {\n" +
             "  image: \"/images/" + tileset.name + "/" + FileInfo.fileName(tile.imageFileName) + "\"" + "\n" +
             "  sprite_trim_mode: SPRITE_TRIM_MODE_OFF\n" +
             "}\n";
 
+        // Save animation data should it exist
         if (tile.animated == true) {
 
             animations += "animations {\n" +
@@ -284,7 +273,8 @@ function processImageCollection(tileset) {
                     "  }\n";
             }
 
-            // Calcution an average of time per frame. (1000 / duration) = fps
+            // Calcution an average of time per frame. 'Duration / frames' = based milliseconds for fps calculation
+            //  fps = (1000 / Duration_base)
             duration /= tile.frames.length;
 
             animations += "  playback: PLAYBACK_LOOP_FORWARD\n" +
@@ -325,6 +315,9 @@ function exportObjects(objectLayer) {
             (object.tile != null ? "    image = \"" + FileInfo.fileName(FileInfo.completeBaseName(object.tile.imageFileName)) : "    \"\"\n,") + "\",\n" +
             "    visible = " + object.visible;
 
+        //---------------------------------------
+        // Show properties only if the exist
+        //---------------------------------------
         let objs = getProperties(object, "    ");
         if (objs != "") {
             stringData += ",\n    properties = {\n" +
@@ -332,30 +325,29 @@ function exportObjects(objectLayer) {
                 "\n    }";
         }
 
-        //
+        // No unneccessary commas in the Lua code
         if ((c + 1) < objectLayer.objectCount)
             stringData += "\n  },\n";
         else
             stringData += "\n  }\n";
     }
 
-    // Remove the last comma and close the array.
-    //stringData = stringData.slice(0, -2) + "\n};\n";
-
+    // Close this segment for good
     stringData += "}\n";
 
     return stringData;
 }
 
 
+//-----------------------------------------------
+//
+// Export properties in a simple form
+// Custom Enums / classes only support numbers
+//
+//-----------------------------------------------
 function getProperties(object, spaces) {
 
     let stringData = "";
-
-    // if (object.properties)
-    //     tiled.alert(object.properties(0).TileObjectPropertyValue);
-
-    //    if (y == 0) {
     let props = object.properties();
 
     for (const [key, value] of Object.entries(props)) {
@@ -365,8 +357,6 @@ function getProperties(object, spaces) {
         //--------------------------------
         // Check for special properties
         //--------------------------------
-        //tiled.log(key);
-
         if (key == "items") {
             let num = value.value;
             let index = 1;
@@ -412,27 +402,18 @@ function getProperties(object, spaces) {
                 } else {
                     //str = spaces + "  [\"" + key + "\"] = " + value.value + ",\n";
                     str = spaces + "  " + key + " = " + value.value + ",\n";
-                    //tiled.log(typeof value.typeName + " " + value.value);                
-                    //tiled.log(value);                
                 }
-
-                //                tiled.log(str);
-                //stringData += str;
             }
             else {
                 //str = spaces + "  [\"" + key + "\"] = " + value + ",\n";
                 str = spaces + "  " + key + " = " + value + ",\n";
-                //tiled.log(str);
-                //stringData += str;
             }
 
-            //        tiled.log(key + " = " + value);
             stringData += str;
         }
     }
 
     // Remove the last comma set
-    //tiled.log(stringData);
     if (stringData != "") {
         stringData = stringData.slice(0, -2);// + "\n";
         tiled.log(stringData);
