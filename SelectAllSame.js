@@ -24,6 +24,9 @@ function traverseLayer(map, objectLayer, tile) {
     for (let c = 0; c < objectLayer.objectCount; c++) {
         let obj = objectLayer.objects[c];
 
+        if (obj.tile == null)
+            continue;
+
         if (obj.tile.id == gid && obj.tile.tileset == tileset) {
             array.push(obj);
         }
@@ -82,7 +85,7 @@ let jumpToObject = tiled.registerAction("JumpToObject", function (/* action */) 
 
 
 jumpToObject.text = "Select Objects with the same GID";
-jumpToObject.shortcut = "F1";
+jumpToObject.shortcut = "ctrl+]";
 
 tiled.extendMenu("Map", [
     { separator: true },
