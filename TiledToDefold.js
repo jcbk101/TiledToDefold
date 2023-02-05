@@ -67,7 +67,7 @@ function processMap(map, fileName) {
     count = 0;
     globalMap = map;
 
-    // This is important! set map file's 'Class' to you base directory.
+    // This is important! set map file's 'Class' to your base directory.
     // IE: c:/defold/MyGame/
     // So if assets or what ever are stored in 'c:/defold/MyGame/assets/...'
     // Then '/assets/...' can be used in the file and directory structure
