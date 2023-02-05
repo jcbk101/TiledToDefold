@@ -30,15 +30,23 @@
  */
 
 var tiledToDefoldExport = {
-    name: "Defold files",
-    extension: "tilemap",
+    name: "Defold Custom Collection",
+    extension: "collection",
     write: processMap
 };
 
 let filePath = "";
 let fileBaseName = "";
 let count = 0;
-let y = 0;
+let collection = "";
+let globalMap = null;
+let objectLayer = null;
+const usedObjs = [];
+
+let collectionHeader =
+    "name: \"default\"\n" +
+    "scale_along_z: 0\n";
+
 
 //--------------------------------
 //
@@ -57,6 +65,15 @@ function processMap(map, fileName) {
     //Find first tile layer
     let currentLayer;
     count = 0;
+    globalMap = map;
+
+    // This is important! set map file's 'Class' to you base directory.
+    // IE: c:/defold/MyGame/
+    // So if assets or what ever are stored in 'c:/defold/MyGame/assets/...'
+    // Then '/assets/...' can be used in the file and directory structure
+    fileBaseName = fileBaseName.replace(map.className, '');
+
+    let newPath = filePath + fileBaseName + "/";
 
     //--------------------------------------
     //
@@ -70,6 +87,10 @@ function processMap(map, fileName) {
         let tileset = map.tilesets[j];
         let iHeader = false;
         let tilesourceFileData = "";
+        let fName = null;
+        let baseName = null;
+        let fPath = null;
+        let re = null;
 
         //-------------------------------------------
         // Tileset MUST be a single image in order 
@@ -77,35 +98,41 @@ function processMap(map, fileName) {
         //-------------------------------------------
         if (tileset.image == "") {
 
-            // Atlas creation using acollection of images. Defold uses 2048x2048 max I believe
+            // Atlas creation using a collection of images. Defold uses 2048x2048 max I believe
             tilesourceFileData = processImageCollection(tileset);
 
             // Write tilesource file
-            let tilesource = new TextFile(filePath + tileset.name + ".atlas", TextFile.WriteOnly);
+            let tilesource = new TextFile(newPath + tileset.name + ".atlas", TextFile.WriteOnly);
             tilesource.write(tilesourceFileData);
             tilesource.commit();
-            console.log("Atlas file exported to " + filePath + tileset.name + ".atlas");
 
             continue;
         }
         else {
+
+            re = RegExp(globalMap.className, "ig");
+            fName = tileset.image.replace(re, '');
+            fPath = FileInfo.path(fileName);
+            baseName = FileInfo.completeBaseName(tileset.image);
+
             // Tilesource data creation
             tilesourceFileData +=
-                "image: \"/tilesources/" + tileset.name + ".png\"\n" +
+                //"image: \"/main/" + fileBaseName + "/" + tileset.name + ".png\"\n" +
+                "image: \"/" + fName + "\"\n" +
                 "tile_width: " + tileset.tileWidth + "\n" +
                 "tile_height: " + tileset.tileHeight + "\n" +
                 "tile_margin: " + tileset.margin + "\n" +
                 "tile_spacing: " + tileset.tileSpacing + "\n" +
-                "collision: \"/tilesources/" + tileset.name + ".png\"\n" +
+                "collision: \"/" + fName + "\"\n" +
                 "material_tag: \"tile\"\n" +
                 "collision_groups: \"ground\"\n" +
-                "extrude_borders: 2\n" +
+                "extrude_borders: 4\n" +
                 "inner_padding: 0\n" +
                 "sprite_trim_mode: SPRITE_TRIM_MODE_OFF\n";
         }
 
         // Header showing tilesource file
-        let tileMapFileData = "tile_set: \"/tilemaps/" + tileset.name + ".tilesource\"\n";
+        let tileMapFileData = "tile_set: \"/" + fPath.replace(re, '') + "/" + fileBaseName + "/" + baseName + ".tilesource\"\n";
 
         //------------------------------------
         //
@@ -117,7 +144,7 @@ function processMap(map, fileName) {
             currentLayer = map.layerAt(i);
 
             //-------------------------------------------
-            // Must be aTile layer, and hasto be visible
+            // Must be a Tile layer, and hasto be visible
             //-------------------------------------------
             if (currentLayer.isTileLayer && currentLayer.visible) {
 
@@ -139,25 +166,29 @@ function processMap(map, fileName) {
                     tilemapStr += "  is_visible: " + ((currentLayer.visible) ? 1 : 0) + "\n";
                     tilemapStr += tempMap;
                     tilemapStr += "}\n";
-
                     // Z-Position
                     z++;
                 }
             }
             else if (currentLayer.isObjectLayer && currentLayer.visible) {
 
-                let tempMap = "";
+                let tempMap = null;
+                let count = 0;
 
-                tempMap = exportObjects(currentLayer);
+                while (tempMap == null && count < 10) {
+                    tempMap = exportObjects(currentLayer);
+                    count++;
+                }
+
+                tiled.log( "Objects: " + ((tempMap == null) ? "null" : "good") + " after " + count + " tries." )
 
                 // Was data stored?
                 if (tempMap != "") {
 
                     // Write the tilemap file
-                    let tilemapFile = new TextFile(filePath + fileBaseName + "_" + currentLayer.name + ".lua", TextFile.WriteOnly);
+                    let tilemapFile = new TextFile(newPath + currentLayer.name + ".lua", TextFile.WriteOnly);
                     tilemapFile.write(tempMap);
                     tilemapFile.commit();
-                    console.log("Tilemap file exported to " + filePath + fileBaseName + "_" + currentLayer.name + ".lua");
 
                     // Z-Position
                     z++;
@@ -171,21 +202,86 @@ function processMap(map, fileName) {
         // Write source data to disk
         //--------------------------------
         if (tilemapStr != "") {
+
+            // Add the footer
+            tilemapStr += "material: \"/builtins/materials/tile_map.material\"\n" +
+                "blend_mode: BLEND_MODE_ALPHA\n";
+
+
             // Write tilesource file
-            let tilesource = new TextFile(filePath + tileset.name + ".tilesource", TextFile.WriteOnly);
+            let tilesource = new TextFile(newPath + tileset.name + ".tilesource", TextFile.WriteOnly);
             tilesource.write(tilesourceFileData);
             tilesource.commit();
-            console.log("Tilesource file exported to " + filePath + tileset.name + ".tilesource");
 
             // Write the tilemap file
-            let tilemapFile = new TextFile(filePath + fileBaseName + "-" + count + ".tilemap", TextFile.WriteOnly);
+            let tilemapFile = new TextFile(newPath + tileset.name + ".tilemap", TextFile.WriteOnly);
             tilemapFile.write(tilemapStr);
             tilemapFile.commit();
-            console.log("Tilemap file exported to " + filePath + fileBaseName + ".tilemap");
+
+            //
+            if (collection == "") {
+                collection += collectionHeader;
+            }
+
+            // Ad the embedded instance
+            let re = RegExp(globalMap.className, "ig");
+            let fName = tileset.image.replace(re, '');
+            let fPath = FileInfo.path(fileName);
+            let baseName = FileInfo.completeBaseName(tileset.image);
+
+            // Header showing tilesource file
+            let tileMapFileData = fPath.replace(re, '') + "/" + fileBaseName + "/" + baseName + ".tilemap";
+            let tname = tileset.name;
+            let mapname = tileMapFileData;
+
+            let emdeddedInstance =
+                "embedded_instances {\n" +
+                "  id: \"tilemaps\"\n" +
+                "  data: \"components {\\n\"\n" +
+                `  \"   id: \\"${tname}\\"\\n\"\n` +              // Tile map name
+                `  \"   component: \\"/${mapname}\\"\\n\"\n` +       // Name of the tilemap file                
+                "  \"   position {\\n\"\n" +
+                "  \"     x: 0.0\\n\"\n" +
+                "  \"     y: 0.0\\n\"\n" +
+                "  \"     z: 0.0\\n\"\n" +
+                "  \"  }\\n\"\n" +
+                "  \"  rotation {\\n\"\n" +
+                "  \"     x: 0.0\\n\"\n" +
+                "  \"     y: 0.0\\n\"\n" +
+                "  \"     z: 0.0\\n\"\n" +
+                "  \"     w: 1.0\\n\"\n" +
+                "  \"  }\\n\"\n" +
+                "  \"}\\n\"\n" +
+                "  \"\"\n" +
+
+                "  position {\n" +
+                "    x: 0\n" +
+                "    y: 0\n" +
+                "    z: 0.0\n" +
+                "  }\n" +
+                "  rotation {\n" +
+                "    x: 0.0\n" +
+                "    y: 0.0\n" +
+                "    z: 0.0\n" +
+                "    w: 1.0\n" +
+                "  }\n" +
+                "  scale3 {\n" +
+                "    x: 1.0\n" +
+                "    y: 1.0\n" +
+                "    z: 1.0\n" +
+                "  }\n" +
+                "}";
+
+            // Write tilesource file
+            let collectionFile = new TextFile(newPath + fileBaseName + ".collection", TextFile.WriteOnly);
+            collectionFile.write(collectionHeader + emdeddedInstance);
+            collectionFile.commit();
         }
         count++;
     }
 }
+
+
 
 //-----------------------------------
 //
@@ -198,8 +294,8 @@ function exportTileLayer(currentLayer, tileset) {
     let set = tileset + "\n";
 
 
-    for (let y = 0; y < currentLayer.height; y++) {
-        for (let x = 0; x < currentLayer.width; x++) {
+    for (let x = 0; x < currentLayer.width; x++) {
+        for (let y = 0; y < currentLayer.height; y++) {
 
             let currentTile = currentLayer.cellAt(x, y);
 
@@ -215,7 +311,7 @@ function exportTileLayer(currentLayer, tileset) {
 
                 stringData += "  cell {\n";
                 stringData += "    x: " + x + "\n";
-                stringData += "    y: " + y + "\n";
+                stringData += "    y: " + (currentLayer.height - y - 1) + "\n";
                 stringData += "    tile: " + currentTile.tileId + "\n";
 
                 stringData += "    h_flip: " + ((currentTile.flippedHorizontally) ? 1 : 0) + "\n";
@@ -242,16 +338,23 @@ function processImageCollection(tileset) {
     let stringData = "";
     let animations = "";
     let duration = 0;
+    let re = RegExp(globalMap.className, "ig");
 
     for (let c = 0; c < tileset.tiles.length; c++) {
 
         let tile = tileset.tiles[c];
 
+        if (tile == null)
+            continue;
+
+        let fName = tile.imageFileName.replace(re, '');
+
         //Header info
         stringData += "images {\n" +
-            "  image: \"/images/" + tileset.name + "/" + FileInfo.fileName(tile.imageFileName) + "\"" + "\n" +
+            "  image: \"/" + fName + "\"" + "\n" +
             "  sprite_trim_mode: SPRITE_TRIM_MODE_OFF\n" +
             "}\n";
+
 
         // Save animation data should it exist
         if (tile.animated == true) {
@@ -264,13 +367,17 @@ function processImageCollection(tileset) {
             for (let i = 0; i < tile.frames.length; i++) {
                 let frame = tile.frames[i];
 
-                // Add all durations together
-                duration += frame.duration;
+                let realTile = getTileOfId(tileset.tiles, frame.tileId);
 
-                animations += "  images {\n" +
-                    "    image: \"/images/" + tileset.name + "/" + FileInfo.fileName(tileset.tiles[frame.tileId].imageFileName) + "\"" + "\n" +
-                    "    sprite_trim_mode: SPRITE_TRIM_MODE_OFF\n" +
-                    "  }\n";
+                if (realTile != null) {
+                    // Add all durations together
+                    duration += frame.duration;
+
+                    animations += "  images {\n" +
+                        "    image: \"/" + realTile.imageFileName + "\"" + "\n" +
+                        "    sprite_trim_mode: SPRITE_TRIM_MODE_OFF\n" +
+                        "  }\n";
+                }
             }
 
             // Calcution an average of time per frame. 'Duration / frames' = based milliseconds for fps calculation
@@ -285,7 +392,31 @@ function processImageCollection(tileset) {
         }
     }
 
-    return stringData + animations;
+    if (stringData != "")
+        return stringData + animations +
+            "margin: 0\n" +
+            "extrude_borders: 4\n" +
+            "inner_padding: 0\n";
+    else
+        return "";
+}
+
+
+//--------------------------------------
+//
+// Return the actual to for tileId
+//
+//--------------------------------------
+function getTileOfId(tiles, id) {
+
+    for (let i = 0; i < tiles.length; i++) {
+
+        if (tiles[i].id == id) {
+            return tiles[i];
+        }
+    }
+
+    return null;
 }
 
 
@@ -297,39 +428,51 @@ function processImageCollection(tileset) {
 function exportObjects(objectLayer) {
 
     let stringData = "return {\n";
+    let mapHeight = globalMap.height * globalMap.tileHeight;
+
+    tiled.log("Number of objects: " + objectLayer.objectCount);
 
     for (let c = 0; c < objectLayer.objectCount; c++) {
 
-        let object = objectLayer.objects[c];
-
-        stringData += "  {\n" +
-            "    id = " + object.id + ",\n" +
-            "    class = \"" + object.className + "\",\n" +
-            "    name = \"" + object.name + "\",\n" +
-            "    x = " + object.x + ",\n" +
-            "    y = " + object.y + ",\n" +
-            "    width = " + object.width + ",\n" +
-            "    height = " + object.height + ",\n" +
-            "    rotation = " + object.rotation + ",\n" +
-            (object.tile != null ? "    source = \"/images/atlas/" + object.tile.tileset.name + ".atlas\",\n" : "    \"\"\n,") +
-            (object.tile != null ? "    image = \"" + FileInfo.fileName(FileInfo.completeBaseName(object.tile.imageFileName)) : "    \"\"\n,") + "\",\n" +
-            "    visible = " + object.visible;
-
-        //---------------------------------------
-        // Show properties only if the exist
-        //---------------------------------------
-        let objs = getProperties(object, "    ");
-        if (objs != "") {
-            stringData += ",\n    properties = {\n" +
-                objs +
-                "\n    }";
+        if (objectLayer.objects[c] == null) {            
+            tiled.log("index: " + c);
+            return null;
         }
 
-        // No unneccessary commas in the Lua code
-        if ((c + 1) < objectLayer.objectCount)
-            stringData += "\n  },\n";
-        else
-            stringData += "\n  }\n";
+        tiled.log("ID: " + objectLayer.objects[c].id);
+
+        if (objectLayer.objects[c] != null) 
+        {
+            stringData += "  {\n" +
+                //"    id = " + object.id + ",\n" +   // Enable for debugging only (find an object that is erroring)
+                "    class = \"" + objectLayer.objects[c].className + "\",\n" +
+                "    name = \"" + objectLayer.objects[c].name + "\",\n" +
+                "    x = " + (objectLayer.objects[c].x) + ",\n" +
+                "    y = " + (mapHeight - objectLayer.objects[c].y) + ",\n" +
+                "    width = " + objectLayer.objects[c].width + ",\n" +
+                "    height = " + objectLayer.objects[c].height + ",\n" +
+                "    rotation = " + objectLayer.objects[c].rotation + ",\n" +
+                "    flip_x = " + ((objectLayer.objects[c].tileFlippedHorizontally == true) ? 1 : 0) + ",\n" +
+                "    flip_y = " + ((objectLayer.objects[c].tileFlippedVertically == true) ? 1 : 0) + ",\n" +
+                (objectLayer.objects[c].tile != null ? "    sprite = \"" + FileInfo.fileName(FileInfo.completeBaseName(objectLayer.objects[c].tile.imageFileName)) : "    \"\"\n,") + "\",\n" +
+                "    visible = " + objectLayer.objects[c].visible;
+
+            //---------------------------------------
+            // Show properties only if the exist
+            //---------------------------------------
+            let objs = getProperties(objectLayer.objects[c], "    ");
+            if (objs != "") {
+                stringData += ",\n    properties = {\n" +
+                    objs +
+                    "\n    }";
+            }
+
+            // No unneccessary commas in the Lua code
+            if ((c + 1) < objectLayer.objectCount)
+                stringData += "\n  },\n";
+            else
+                stringData += "\n  }\n";
+        }
     }
 
     // Close this segment for good
@@ -361,11 +504,9 @@ function getProperties(object, spaces) {
             let num = value.value;
             let index = 1;
 
-            if (num > 0)
-                //str = spaces + "  [\"" + key + "\"] = {";
-                str = spaces + "  " + key + " = {";
-            //
-
+            if (num > 0) str = spaces + "  " + key + " = {";
+            
+            //----------------------------------
             while (num > 0) {
                 if (num & 1) {
                     if (index == 1)
@@ -380,7 +521,6 @@ function getProperties(object, spaces) {
 
             if (str != "") str += " },\n";
 
-            tiled.log(str);
             stringData += str;
         }
         else {
@@ -388,24 +528,19 @@ function getProperties(object, spaces) {
 
                 // Is it a ref to an object?
                 if (value.typeName == null) {
-                    //tiled.log(typeof value + " " + value.id + " " + value.x + " " + value.type + " " + value.constructor.type);
 
                     if (value.id == null)
                         // String object
-                        //str = spaces + "  [\"" + key + "\"] = \"" + value + "\",\n";
                         str = spaces + "  " + key + " = \"" + value + "\",\n";
                     else
                         // Map object
-                        //str = spaces + "  [\"" + key + "\"] = { id = " + value.id + " },\n";
                         str = spaces + "  " + key + " = { id = " + value.id + " },\n";
 
                 } else {
-                    //str = spaces + "  [\"" + key + "\"] = " + value.value + ",\n";
                     str = spaces + "  " + key + " = " + value.value + ",\n";
                 }
             }
             else {
-                //str = spaces + "  [\"" + key + "\"] = " + value + ",\n";
                 str = spaces + "  " + key + " = " + value + ",\n";
             }
 
@@ -416,7 +551,6 @@ function getProperties(object, spaces) {
     // Remove the last comma set
     if (stringData != "") {
         stringData = stringData.slice(0, -2);// + "\n";
-        tiled.log(stringData);
     }
 
     return stringData;
@@ -424,4 +558,4 @@ function getProperties(object, spaces) {
 
 
 // Register this action to the "Export As" menu selection
-tiled.registerMapFormat("TiledToDefoldExport", tiledToDefoldExport)
+tiled.registerMapFormat("TiledToDefoldExport", tiledToDefoldExport);
