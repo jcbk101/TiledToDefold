@@ -5,14 +5,14 @@
  * 
  * This extension adds a 'Select all objects using the same GID' (F1) action to the Map
  * menu, which can be used to quickly select objects when you have a similar
- * object already selected. The object must have a tile assigned to i.
+ * object already selected. The object must have a tile assigned to it.
  *
  */
 
 
 //-----------------------------------
 //
-// Handle selecting miltiple objects
+// Handle selecting multiple objects
 //
 //-----------------------------------
 function traverseLayer(map, objectLayer, tile) {
@@ -52,7 +52,7 @@ let jumpToObject = tiled.registerAction("JumpToObject", function (/* action */) 
         currentLayer = map.layerAt(i);
 
         //-------------------------------------------
-        // Must be aTile layer, and hasto be visible
+        // Must be a Tile layer, and hasto be visible
         //-------------------------------------------
         if (currentLayer.isObjectLayer && currentLayer.visible) {
 
